@@ -28,3 +28,9 @@ jobs:
         GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
       run: |
         python autobot_linkedin.py
+    - name: Lưu ảnh chụp màn hình khi bị lỗi
+      if: always() 
+      uses: actions/upload-artifact@v4
+      with:
+        name: error-screenshots
+        path: "*.png"
