@@ -837,7 +837,7 @@ def post_to_linkedin(index, driver, screenshot_path):
 
 """### **Thực hiện lặp qua các dòng để đăng bài viết với nội dung tương ứng và cập nhật trạng thái, với giới hạn 5 bài đăng mỗi ngày nhằm tránh antibot**"""
 
-post_limit = 5
+post_limit = 2
 post_count = 0
 
 for index, row in df.iterrows():
