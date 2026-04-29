@@ -202,9 +202,23 @@ def get_missive_linkedin_code():
 
 
 def login(driver, username: str, password: str):
-    XPATH_USERNAME = '//input[@id="username" or @name="session_key" or @autocomplete="username" or @type="email" or @type="text"]'
-    XPATH_PASSWORD = '//input[@id="password" or @name="session_password" or @autocomplete="current-password" or @type="password"]'
-    XPATH_LOGIN_BUTTON = '//button[contains(@class, "btn__primary--large") or @type="submit" or @aria-label="Sign in"]'
+    XPATH_USERNAME = (
+        '//input[@id="username" or @id="session_key" or @name="session_key" '
+        'or @autocomplete="username" or @type="email" or @type="text" '
+        'or contains(@aria-label, "Email or phone")]'
+    )
+
+    XPATH_PASSWORD = (
+        '//input[@id="password" or @id="session_password" or @name="session_password" '
+        'or @autocomplete="current-password" or @type="password" '
+        'or contains(@aria-label, "Password")]'
+    )
+
+    XPATH_LOGIN_BUTTON = (
+        '//button[contains(@class, "btn__primary--large") or @type="submit" '
+        'or @aria-label="Sign in" or @data-id="sign-in-form__submit-btn" '
+        'or contains(text(), "Sign in")]'
+    )
 
     try:
         credentials = load_credentials(driver, CREDENTIALS_FILE)
