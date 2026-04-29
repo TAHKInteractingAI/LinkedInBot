@@ -58,7 +58,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 service = build("sheets", "v4", credentials=creds)
 # SPREEDSHEET GỐC.
 spreadsheet_ID = "1zsz3xw7_A1nD_xemikEJY1pXHAeBSVthG_MWDSCMx5E"
-# RANGE GỐC.
+# RANGE MỞ RỘNG (TỪ A ĐẾN I ĐỂ CHỨA LINK VÀ DATE)
 range_name = "input_linkedin!A:I"
 # CALL GOOGLE SHEETS API.
 sheet = service.spreadsheets()
@@ -80,31 +80,10 @@ if "Date post" not in df.columns:
 
 df.head()
 
-# def download_image(file_id, save_path):
-#     url = f"https://drive.google.com/uc?export=download&id={file_id}"
-#     response = requests.get(url, stream=True)
-#     if response.status_code == 200:
-#         with open(save_path, 'wb') as f:
-#             f.write(response.content)
-#         print(f"Image saved to {save_path}")
-#     else:
-#         print("Failed to download the image. Status code:", response.status_code)
-
-# file_id = '1nj129Ux1uxnIcg2JQ9fKaG8JdPKkNN-D'
-# save_path = df['IMAGE'][0]
-# download_image(file_id, save_path)
-
 """# **Thực hiện đăng nhập vào tài khoản Linkedin**
 
 ### **Thực hiện triển khai hàm lưu ảnh chụp nhanh**
 """
-
-# # Đường dẫn cần tạo thư mục
-# folder_path = '/content/drive/MyDrive/Data_Linkedin'
-
-# # Tạo thư mục nếu chưa tồn tại
-# if not os.path.exists(folder_path):
-#     os.makedirs(folder_path)
 
 
 def save_display_screenshot(driver, screenshot_path):
@@ -123,8 +102,7 @@ def get_driver():
     options.add_argument(f"user-agent={user_agent}")
 
     # 2. Các thiết lập cơ bản cho môi trường máy chủ (Headless)
-    # Tạm thời bạn có thể comment dòng --headless lại bằng dấu # nếu muốn xem Chrome tự động thao tác trên màn hình
-    options.add_argument("--headless")
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
@@ -161,15 +139,12 @@ browser.implicitly_wait(15)
 browser.get("https://www.linkedin.com/login?fromSignIn=true")
 
 time.sleep(5)
-# Lưu ảnh chụp màn hình
-# screenshot_path = '/content/drive/MyDrive/Data_Linkedin/screenshot.png'
 screenshot_path = "screenshot.png"
 save_display_screenshot(browser, screenshot_path)
 
 """### **Thực hiện triển khai hàm lưu cookie, tải cookie, lưu thông tin, tải thông tin, lấy mã từ email và đăng nhập vào tài khoản Linkedin**"""
 
 
-# SUPPORT FUNC (CÓ THỂ UNCOMMENT HÀM SAU VÀ THAY THẾ HÀM BÊN DƯỚI ĐỂ SEND_KEY NHANH HƠN)
 def human_type(element, text):
     """Gõ phím mù bằng ActionChains, miễn nhiễm với lỗi chặn của Selenium"""
     driver = element.parent
@@ -177,11 +152,6 @@ def human_type(element, text):
     time.sleep(random.uniform(1, 2))
 
 
-# def human_type(element, text):
-#     """Gõ phím như người thật với độ trễ ngẫu nhiên"""
-#     for char in text:
-#         element.send_keys(char)
-#         time.sleep(random.uniform(0.1, 0.3))
 def handle_cookie_acceptance(driver: webdriver.Chrome):
     try:
         driver.find_element(By.XPATH, "//button[span[text()='Accept']]").click()
@@ -227,9 +197,7 @@ def handle_code_verification(driver: webdriver.Chrome):
         CONDITION = EC.presence_of_element_located((By.ID, ID_FIELD))
         submit_button = WebDriverWait(driver, 20).until(CONDITION)
         # ENTER VERIFICATION CODE.
-        code = (
-            get_missive_linkedin_code()
-        )  # input("Verification code required! Check your email and enter the code: ")
+        code = get_missive_linkedin_code()
         print(code)
         driver.save_screenshot("before_verification.png")
         time.sleep(2)
@@ -263,8 +231,8 @@ def get_missive_linkedin_code():
 def login(driver, username: str, password: str):
     """Đăng nhập vào LinkedIn theo ưu tiên:
     -> cookies.pkl
-    -> username/password của crendentials.pkl nếu username/password giống nhau
-    -> đăng nhập username/password thủ công và lưu các file
+    -> Welcome Back (Đã fix lỗi chạy quá nhanh)
+    -> Đăng nhập thủ công (Đã fix vòng lặp Cookie)
     """
     XPATH_USERNAME = '//input[@id="username" or @name="session_key" or @autocomplete="username" or @type="email" or @type="text"]'
     XPATH_PASSWORD = '//input[@id="password" or @name="session_password" or @autocomplete="current-password" or @type="password"]'
@@ -276,34 +244,33 @@ def login(driver, username: str, password: str):
         input_username = credentials["username"]
         input_password = credentials["password"]
     except:
-        print("Không có file credentials.pkl, đăng nhập với biến username và password")
+        print(
+            "INFO: Không có file credentials.pkl, dùng biến môi trường username và password"
+        )
         input_username = username
         input_password = password
         save_credentials(input_username, input_password, CREDENTIALS_FILE)
 
     driver.get("https://www.linkedin.com/login")
-    time.sleep(2)  # Ensure the page is fully loaded
+    time.sleep(2)
 
+    # BƯỚC 1: Xử lý Cookie và Welcome Back
     if os.path.exists(COOKIES_FILE):
         load_cookies(driver, COOKIES_FILE)
         driver.get("https://www.linkedin.com/feed")
-        time.sleep(3)
+        time.sleep(5)
 
-        # Kiểm tra xem đã đăng nhập chưa bằng cách xem có biểu tượng người dùng không
         try:
-            # Chờ tối đa 15s, nếu URL có chứa chữ "feed" nghĩa là cookie vẫn xịn và đã vào được trang chủ
-            WebDriverWait(driver, 15).until(lambda d: "feed" in d.current_url)
+            WebDriverWait(driver, 10).until(lambda d: "feed" in d.current_url)
             print("INFO: Logged in using cookies!")
-            save_display_screenshot(driver, "cookie-login.png")
             return
         except:
             print(
                 "INFO: Cookies chưa vào thẳng Feed. Đang kiểm tra màn hình Welcome Back..."
             )
 
-            # --- GIẢI QUYẾT MÀN HÌNH WELCOME BACK ---
             try:
-                # Tìm ô Password trên màn hình
+                # DÙNG WAIT ĐỂ CHỜ Ô PASSWORD XUẤT HIỆN
                 pwd_field = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located(
                         (
@@ -320,7 +287,7 @@ def login(driver, username: str, password: str):
                 pwd_field.send_keys(input_password)
                 time.sleep(1)
 
-                # Bấm nút Sign in
+                # Dùng JS Click cho nút Sign In để tránh bị Popup che khuất
                 sign_in_btn = driver.find_element(
                     By.XPATH, "//button[@type='submit' or contains(text(), 'Sign in')]"
                 )
@@ -328,7 +295,6 @@ def login(driver, username: str, password: str):
                 print("  [DEBUG] Đã bấm Sign in, chờ xác thực...")
                 time.sleep(8)
 
-                # Đôi khi LinkedIn đòi mã PIN sau khi nhập mật khẩu
                 handle_code_verification(driver)
                 handle_cookie_acceptance(driver)
 
@@ -339,32 +305,30 @@ def login(driver, username: str, password: str):
                     return
                 else:
                     print(
-                        "  [DEBUG] Vẫn chưa vào được Feed. Sẽ chuyển sang đăng nhập thủ công..."
+                        "  [DEBUG] Vẫn chưa vào được Feed. Chuyển sang đăng nhập thủ công..."
                     )
             except Exception as e:
                 print(
                     f"INFO: Không thể vượt Welcome Back ({str(e)[:30]}). Bắt đầu đăng nhập từ đầu..."
                 )
 
+            # XÓA COOKIE HỎNG ĐỂ PHÁ VỠ VÒNG LẶP CHUYỂN HƯỚNG CỦA LINKEDIN
             driver.delete_all_cookies()
             time.sleep(2)
 
-    # Nếu thông tin đăng nhập đã thay đổi hoặc không có cookies, đăng nhập thủ công
+    # BƯỚC 2: Đăng nhập thủ công
     print("INFO: Tiến hành đăng nhập thủ công từ đầu...")
     driver.get("https://www.linkedin.com/login")
 
     username_field = WebDriverWait(driver, 60).until(
         EC.element_to_be_clickable((By.XPATH, XPATH_USERNAME))
     )
-    print(XPATH_USERNAME)
     password_field = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located((By.XPATH, XPATH_PASSWORD))
     )
-    print(XPATH_PASSWORD)
     login_button = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located((By.XPATH, XPATH_LOGIN_BUTTON))
     )
-    print(XPATH_LOGIN_BUTTON)
 
     username_field.clear()
     username_field.send_keys(input_username)
@@ -382,43 +346,30 @@ def login(driver, username: str, password: str):
     handle_code_verification(driver)
     handle_cookie_acceptance(driver)
 
-    # KIỂM TRA NGHIÊM NGẶT: Chỉ báo thành công nếu thanh địa chỉ có chữ 'feed'
     if "feed" in driver.current_url:
         save_cookies(driver)
         save_credentials(input_username, input_password, CREDENTIALS_FILE)
         print("INFO: Đăng nhập thành công thật sự và đã lưu cookies!")
-        save_display_screenshot(driver, "post-login-success.png")
     else:
         print(
             "❌ LỖI TRẦM TRỌNG: Đăng nhập thất bại! Sai tài khoản/mật khẩu hoặc bị đòi CAPTCHA."
         )
-        save_display_screenshot(driver, "login-failed.png")
-        # Chủ động ép sập chương trình để không chạy tiếp phần Đăng bài nữa
+        driver.save_screenshot("login-failed.png")
         raise Exception("Login Failed! Please check your credentials or CAPTCHA.")
 
 
 """### **Thực hiện đăng nhập vào tài khoản Linkedin**"""
 
-# cookie_path = '/content/drive/MyDrive/Data_Linkedin/cookie.pkl'
-# credential_path = '/content/drive/MyDrive/Data_Linkedin/credential.pkl'
 login(browser, USERNAME, PASSWORD)
-
-"""# **Thực hiện triển khai tự động post bài viết lên Linkedin**
-
-### **Đính kèm tệp bằng cách tải lên tệp trên Google Colab và đoạn code sẽ tự động lấy đường dẫn tệp**
-"""
 
 
 def safe_click(driver, xpath, timeout=5):
     try:
         el = WebDriverWait(driver, timeout).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, xpath)
-            )  # Use element_to_be_clickable for better robustness
+            EC.element_to_be_clickable((By.XPATH, xpath))
         )
-        print(f"DEBUG: Element found and clickable for XPath: {xpath}")
-        driver.execute_script("arguments[0].click();", el)
         print(f"DEBUG: Click successful for XPath: {xpath}")
+        driver.execute_script("arguments[0].click();", el)
         return True
     except TimeoutException:
         print(
@@ -429,7 +380,6 @@ def safe_click(driver, xpath, timeout=5):
         print(
             f"DEBUG: An unexpected error occurred during safe_click for XPath: {xpath}: {e}"
         )
-        traceback.print_exc()  # Print full traceback for unexpected errors in safe_click
         return False
 
 
@@ -440,15 +390,12 @@ def ensure_top(driver):
 
 
 def wait_feed_loaded(driver):
-    """Đợi LinkedIn feed load hoàn toàn"""
+    """Đợi LinkedIn feed load hoàn toàn (Bản cập nhật)"""
     try:
-        # Tìm thẻ <main> chứa toàn bộ nội dung feed, thẻ này ổn định và hiếm khi bị đổi tên
         WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.TAG_NAME, "main"))
         )
     except:
-        # Nếu không tìm thấy thẻ main, thay vì báo lỗi sập chương trình,
-        # ta cho bot ngủ 5 giây để trang tự load xong rồi ép nó chạy tiếp Bước 1.
         print("Cảnh báo: Không tìm thấy thẻ main, tiếp tục ép chạy...")
         time.sleep(5)
 
@@ -507,8 +454,8 @@ def get_random_image_from_drive(creds, folder_id):
 
 
 def post_to_linkedin(index, driver, screenshot_path):
-    global status
-    local_image_path = None  # Khai báo biến để theo dõi file ảnh tạm
+    local_image_path = None
+    post_link = ""
 
     try:
         actions = ActionChains(driver)
@@ -593,7 +540,7 @@ def post_to_linkedin(index, driver, screenshot_path):
                     pass
 
         except Exception as e:
-            print(f"  [DEBUG-STEP 2] Lỗi hệ thống khi quét nút: {str(e)[:100]}")
+            print(f"  [DEBUG-STEP 2] Lỗi hệ thống khi quét nút.")
 
         if not is_modal_opened:
             driver.save_screenshot("error_step2_modal_failed.png")
@@ -697,10 +644,9 @@ def post_to_linkedin(index, driver, screenshot_path):
             act.send_keys(Keys.ENTER).perform()
             act.send_keys(Keys.ENTER).perform()
 
-        # VÒNG LẶP GẮN THẺ (MENTION) - ĐÃ CĂN LẠI NHỊP
+        # VÒNG LẶP GẮN THẺ (MENTION)
         for i in range(len(tag_array)):
             if i < len(company_array):
-                # Gõ chữ @Tên + Công ty
                 text = tag_array[i] + " " + company_array[i]
                 human_type(insert_content_area, text)
 
@@ -731,7 +677,6 @@ def post_to_linkedin(index, driver, screenshot_path):
         folder_id = extract_folder_id(linkedin_image_url)
 
         if folder_id:
-            # creds là biến toàn cục bạn đã khai báo ở phần đầu code
             local_image_path = get_random_image_from_drive(creds, folder_id)
         else:
             print("  [DEBUG-STEP 6] Không tìm thấy Folder ID hợp lệ trong link.")
@@ -739,7 +684,6 @@ def post_to_linkedin(index, driver, screenshot_path):
         if local_image_path and os.path.exists(local_image_path):
             print(f"  [DEBUG-STEP 6] Đang tải lên ảnh: {local_image_path}")
 
-            # Đóng preview link bằng Javascript
             driver.execute_script("""
                 let host = document.querySelector('#interop-outlet');
                 let root = (host && host.shadowRoot) ? host.shadowRoot : document;
@@ -748,7 +692,6 @@ def post_to_linkedin(index, driver, screenshot_path):
             """)
             time.sleep(1)
 
-            # Bấm Add Media
             clicked_media = driver.execute_script("""
                 let host = document.querySelector('#interop-outlet');
                 let root = (host && host.shadowRoot) ? host.shadowRoot : document;
@@ -792,7 +735,7 @@ def post_to_linkedin(index, driver, screenshot_path):
             print("  LƯU Ý: Bỏ qua upload ảnh vì không tải được ảnh từ Drive.")
 
         # -------------------
-        # STEP 7 — Nhấn nút POST
+        # STEP 7 — Nhấn nút POST VÀ LẤY LINK TỰ ĐỘNG
         # -------------------
         print("Step 7: Nhấn nút POST...")
         time.sleep(2)
@@ -811,28 +754,50 @@ def post_to_linkedin(index, driver, screenshot_path):
         if not post_success:
             raise Exception("Không thể nhấn nút Post (Nút bị mờ hoặc không tìm thấy).")
 
-        time.sleep(10)
+        # Đứng đợi cái thông báo "Post successful" xuất hiện để lấy link
+        print("  [DEBUG-STEP 7] Đang đứng đợi để tóm gọn link bài viết...")
+        for _ in range(15):
+            try:
+                link = driver.execute_script(
+                    "let a = document.querySelector('.artdeco-toast-item a'); return a ? a.href : '';"
+                )
+                if link:
+                    post_link = link
+                    print(f"  ✅ Đã lấy được link bài viết: {post_link}")
+                    break
+            except:
+                pass
+            time.sleep(1)
+
+        if not post_link:
+            print(
+                "  ⚠ Đăng thành công nhưng thông báo tắt quá nhanh nên không bắt kịp link."
+            )
+            post_link = "Thành công (Không lấy kịp link)"
+
+        time.sleep(5)
         print("🎉 XÁC NHẬN: Bài viết đã lên sóng thành công!")
-        status = "Success"
+
+        return "Success", post_link
 
     except Exception as e:
         print(f"Lỗi: Bài viết chưa được đăng. Chi tiết: {str(e)[:100]}")
         driver.save_screenshot("error_step_final.png")
-        status = "Failed"
+        return "Failed", ""
 
     finally:
-        # DỌN RÁC: Xóa file ảnh tạm tải từ Drive về để khỏi đầy ổ cứng
+        # DỌN RÁC
         if local_image_path and os.path.exists(local_image_path):
             try:
                 os.remove(local_image_path)
                 print(f"🧹 Đã dọn dẹp xóa ảnh tạm: {local_image_path}")
             except Exception as e:
-                print("⚠ Không thể xóa ảnh tạm:", e)
+                pass
 
 
 """### **Thực hiện lặp qua các dòng để đăng bài viết với nội dung tương ứng và cập nhật trạng thái, với giới hạn 5 bài đăng mỗi ngày nhằm tránh antibot**"""
 
-post_limit = 2
+post_limit = 5
 post_count = 0
 
 for index, row in df.iterrows():
@@ -852,7 +817,6 @@ for index, row in df.iterrows():
 
         df.at[index, "Status"] = status
 
-        # Tăng biến đếm bài đăng (mỗi lần cố gắng thực thi sẽ tính vào giới hạn)
         post_count += 1
 
         if status == "Success":
@@ -863,12 +827,10 @@ for index, row in df.iterrows():
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             df.at[index, "Date post"] = now_str
 
-            # Nghỉ giữa các bài đăng thành công để tránh bị khóa acc
             wait_time = random.randint(30, 60)
             print(f"Post successful. Waiting {wait_time}s before next post...")
             time.sleep(wait_time)
         else:
-            # Nghỉ ngắn nếu lỗi
             print("Post failed. Waiting 15s before retrying...")
             time.sleep(15)
     else:
