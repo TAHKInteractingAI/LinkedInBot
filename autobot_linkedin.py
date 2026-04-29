@@ -59,7 +59,7 @@ service = build("sheets", "v4", credentials=creds)
 # SPREEDSHEET GỐC.
 spreadsheet_ID = "1zsz3xw7_A1nD_xemikEJY1pXHAeBSVthG_MWDSCMx5E"
 # RANGE GỐC.
-range_name = "input_linkedin!A:G"
+range_name = "input_linkedin!A:I"
 # CALL GOOGLE SHEETS API.
 sheet = service.spreadsheets()
 result = sheet.values().get(spreadsheetId=spreadsheet_ID, range=range_name).execute()
@@ -71,6 +71,13 @@ values = [row + [""] * (max_cols - len(row)) for row in values]
 df = pd.DataFrame(values[1:], columns=values[0])
 # FILL ALL NAN WITH AN EMPTY STRING.
 df = df.fillna("")
+
+# Đảm bảo 2 cột mới tồn tại trong DataFrame để tránh lỗi nếu Google Sheet gõ sai tên
+if "Link bài đã post" not in df.columns:
+    df["Link bài đã post"] = ""
+if "Date post" not in df.columns:
+    df["Date post"] = ""
+
 df.head()
 
 # def download_image(file_id, save_path):
@@ -138,13 +145,11 @@ def get_driver():
     driver.set_window_size(1920, 1200)
 
     # 4. Ẩn thuộc tính navigator.webdriver bằng Script
-    driver.execute_script(
-        """
+    driver.execute_script("""
         Object.defineProperty(navigator, 'webdriver', {
             get: () => undefined
         })
-        """
-    )
+        """)
 
     return driver
 
@@ -435,7 +440,7 @@ def ensure_top(driver):
 
 
 def wait_feed_loaded(driver):
-    """Đợi LinkedIn feed load hoàn toàn (Bản cập nhật)"""
+    """Đợi LinkedIn feed load hoàn toàn"""
     try:
         # Tìm thẻ <main> chứa toàn bộ nội dung feed, thẻ này ổn định và hiếm khi bị đổi tên
         WebDriverWait(driver, 30).until(
@@ -735,19 +740,16 @@ def post_to_linkedin(index, driver, screenshot_path):
             print(f"  [DEBUG-STEP 6] Đang tải lên ảnh: {local_image_path}")
 
             # Đóng preview link bằng Javascript
-            driver.execute_script(
-                """
+            driver.execute_script("""
                 let host = document.querySelector('#interop-outlet');
                 let root = (host && host.shadowRoot) ? host.shadowRoot : document;
                 let dismissBtn = root.querySelector('button[aria-label*="Dismiss preview"]');
                 if(dismissBtn) dismissBtn.click();
-            """
-            )
+            """)
             time.sleep(1)
 
             # Bấm Add Media
-            clicked_media = driver.execute_script(
-                """
+            clicked_media = driver.execute_script("""
                 let host = document.querySelector('#interop-outlet');
                 let root = (host && host.shadowRoot) ? host.shadowRoot : document;
                 let addMediaBtn = root.querySelector('button[aria-label="Add media"]');
@@ -756,27 +758,23 @@ def post_to_linkedin(index, driver, screenshot_path):
                     return true;
                 }
                 return false;
-            """
-            )
+            """)
 
             if clicked_media:
                 time.sleep(2)
                 try:
-                    file_input = driver.execute_script(
-                        """
+                    file_input = driver.execute_script("""
                         let host = document.querySelector('#interop-outlet');
                         let root = (host && host.shadowRoot) ? host.shadowRoot : document;
                         return root.querySelector('input[type="file"]') || document.querySelector('input[type="file"]');
-                    """
-                    )
+                    """)
                     file_input.send_keys(local_image_path)
                     print(
                         "  [DEBUG-STEP 6] Đã đẩy file ảnh lên thành công, chờ 5s để load..."
                     )
                     time.sleep(5)
 
-                    driver.execute_script(
-                        """
+                    driver.execute_script("""
                         let host = document.querySelector('#interop-outlet');
                         let root = (host && host.shadowRoot) ? host.shadowRoot : document;
                         let btns = root.querySelectorAll('button');
@@ -786,8 +784,7 @@ def post_to_linkedin(index, driver, screenshot_path):
                                 break;
                             }
                         }
-                    """
-                    )
+                    """)
                     time.sleep(3)
                 except Exception as e:
                     print("  [DEBUG-STEP 6] Lỗi xử lý gửi ảnh:", str(e)[:100])
@@ -800,8 +797,7 @@ def post_to_linkedin(index, driver, screenshot_path):
         print("Step 7: Nhấn nút POST...")
         time.sleep(2)
 
-        post_success = driver.execute_script(
-            """
+        post_success = driver.execute_script("""
             let host = document.querySelector('#interop-outlet');
             let root = (host && host.shadowRoot) ? host.shadowRoot : document;
             let postBtn = root.querySelector('.share-actions__primary-action');
@@ -810,8 +806,7 @@ def post_to_linkedin(index, driver, screenshot_path):
                 return true;
             }
             return false;
-        """
-        )
+        """)
 
         if not post_success:
             raise Exception("Không thể nhấn nút Post (Nút bị mờ hoặc không tìm thấy).")
@@ -851,13 +846,23 @@ for index, row in df.iterrows():
     # Chỉ xử lý nếu Status là trống hoặc Failed
     if current_status == "" or current_status == "Failed":
         print(f"Processing row {index}...")
-        post_to_linkedin(index, browser, screenshot_path)
+
+        # Nhận cả trạng thái và Link bài post từ hàm trả về
+        status, post_link = post_to_linkedin(index, browser, screenshot_path)
+
         df.at[index, "Status"] = status
 
         # Tăng biến đếm bài đăng (mỗi lần cố gắng thực thi sẽ tính vào giới hạn)
         post_count += 1
 
         if status == "Success":
+            # ĐIỀN LINK VÀ NGÀY GIỜ VÀO GOOGLE SHEET
+            df.at[index, "Link bài đã post"] = post_link
+
+            # Lấy giờ hệ thống và định dạng lại (VD: 2026-04-29 10:30:00)
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            df.at[index, "Date post"] = now_str
+
             # Nghỉ giữa các bài đăng thành công để tránh bị khóa acc
             wait_time = random.randint(30, 60)
             print(f"Post successful. Waiting {wait_time}s before next post...")
